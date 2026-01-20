@@ -53,6 +53,8 @@ function getDepartmentPrefix(department) {
 async function syncFromSheet() {
   const rows = await readSheet();
 
+  console.log('🔍 rows[1] =', rows[1]); // 👈 ใส่ตรงนี้
+  console.log('📄 rows type =', Array.isArray(rows));
   // 🔐 เวลาล่าสุดใน DB
   const [last] = await db.execute(
     'SELECT MAX(timestamp) AS last_ts FROM data_imports'
@@ -63,8 +65,7 @@ async function syncFromSheet() {
 
   let inserted = 0;
 
-  // ✅ ข้าม header
-  for (const row of rows.slice(1)) {
+for (const row of rows) {
     const [
       timestamp,
       requester_id,
