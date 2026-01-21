@@ -67,7 +67,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    const user = await userService.findByPnsId(pns_id);
+    const user = await userService.findUserByPnsId(pns_id);
     if (!user) {
       return res.status(401).json({
         ok: false,
