@@ -6,7 +6,6 @@ exports.getAllRepairs = async () => {
       requester_id,
       dep_alert,
       location,
-      dep_requester,
       detail_report
     FROM data_imports
     ORDER BY timestamp DESC

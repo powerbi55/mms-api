@@ -6,11 +6,7 @@ const userService = require('../services/user.service');
 // role ที่อนุญาต (ต้องตรง ENUM)
 const ALLOWED_ROLES = ['ADMIN', 'ChiefTechnician', 'Technician'];
 
-/**
- * REGISTER
- * - client ส่ง pns_id, user_password, user_role
- * - server validate role
- */
+/*** REGISTER* - client ส่ง pns_id, user_password, user_role* - server validate role*/
 exports.register = async (req, res) => {
   try {
     const { pns_id, user_password, user_role } = req.body;
@@ -51,23 +47,26 @@ exports.register = async (req, res) => {
   }
 };
 
-/**
- * LOGIN
- * - ใช้ pns_id + password
- * - ใส่ role + dep_id ใน JWT
- */
+/*** LOGIN* - ใช้ pns_id + password* - ใส่ role + dep_id ใน JWT*/
 exports.login = async (req, res) => {
   try {
-    const { pns_id, password } = req.body;
+    const { pns_id, user_password } = req.body;
 
-    if (!pns_id || !password) {
+    if (!pns_id || !user_password) {
       return res.status(400).json({
         ok: false,
         message: 'Missing data'
       });
     }
 
+    console.log('🔐 LOGIN STEP');
+    console.log('input pns_id:', pns_id);
+    console.log('input password:', user_password);
+
     const user = await userService.findUserByPnsId(pns_id);
+
+    console.log('db user_password:', user.user_password);
+
     if (!user) {
       return res.status(401).json({
         ok: false,
@@ -75,7 +74,7 @@ exports.login = async (req, res) => {
       });
     }
 
-    const match = await bcrypt.compare(password, user.user_password);
+    const match = await bcrypt.compare(user_password, user.user_password);
     if (!match) {
       return res.status(401).json({
         ok: false,
