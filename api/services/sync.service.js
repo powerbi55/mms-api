@@ -11,7 +11,7 @@ function normalizeDatetime(value) {
     return value.toISOString().slice(0, 19).replace('T', ' ');
   }
 
-  // 13/1/2026, 13:26:44
+  // 13/1/2026, 13:26:44 เเปลงค่าเวลาให้ใชช้ได้กับ MySQL
   if (typeof value === 'string' && value.includes('/')) {
     const [d, m, rest] = value.split('/');
     const [y, time] = rest.split(', ');
@@ -24,28 +24,29 @@ function normalizeDatetime(value) {
 /* -----------------------------
    Department → Prefix
 ----------------------------- */
-function getDepartmentPrefix(department) {
-  if (!department) return 'UNK';
-
-  const dep = department.toString().trim();
+function getDepartmentPrefix(depAlert) {
+  if (!depAlert) return 'UNKNOWN';
 
   const map = [
-    { keyword: "เครือข่าย", prefix: "ONT-NW" },
-    { keyword: "จราจรอัจฉริยะ", prefix: "OTN-ITR" },
-    { keyword: "อุปกรณ์เทคโนโลยีสารสนเทศ", prefix: "OTN-IT" },
-    { keyword: "ระบบเก็บค่าผ่านทาง", prefix: "OTE" },
-    { keyword: "Application", prefix: "OTD-APP" },
-    { keyword: "Toll System", prefix: "OTD-TOLL" }
+    { keywords: ['ONT-NW'], dep_id: 'OTN-NW' },
+    { keywords: ['OTN-ITR'], dep_id: 'OTN-ITR' },
+    { keywords: ['OTN-IT'], dep_id: 'OTN-IT' },
+    { keywords: ['OTE'], dep_id: 'OTE' },
+    { keywords: ['OTD-APP'], dep_id: 'OTD-APP' },
+    { keywords: ['OTD-TOLL'], dep_id: 'OTD-TOLL' }
   ];
 
-  for (const item of map) {
-    if (dep.includes(item.keyword)) {
-      return item.prefix;
+  const text = depAlert.toUpperCase();
+
+  for (const g of map) {
+    if (g.keywords.some(k => text.includes(k.toUpperCase()))) {
+      return g.dep_id;
     }
   }
 
-  return dep.substring(0, 3).toUpperCase();
+  return 'UNKNOWN';
 }
+
 
 /* -----------------------------
    Sync Job
@@ -53,21 +54,28 @@ function getDepartmentPrefix(department) {
 async function syncFromSheet() {
   const rows = await readSheet();
 
-  console.log('🔍 rows[1] =', rows[1]); // 👈 ใส่ตรงนี้
+  console.log('🔍 rows[1] =', rows[1]);
   console.log('📄 rows type =', Array.isArray(rows));
-  // 🔐 เวลาล่าสุดใน DB
-  const [last] = await db.execute(
-    'SELECT MAX(timestamp) AS last_ts FROM data_imports'
-  );
-  const lastTs = last[0].last_ts;
 
-  console.log('🕒 last timestamp =', lastTs);
+  // 🔐 ดึง timestamp ล่าสุดจาก DB (ตัวเดียว)
+  const [last] = await db.execute(
+    'SELECT timestamp FROM data_imports ORDER BY timestamp DESC LIMIT 1'
+  );
+  let currentLastTs = last.length ? last[0].timestamp : null;
+
+  console.log('🕒 last timestamp =', currentLastTs);
 
   let inserted = 0;
 
-for (const row of rows) {
+  // 🔄 เรียงข้อมูลจาก sheet ตามเวลา (กันข้อมูลสลับ)
+  const sortedRows = rows
+    .map(r => ({ row: r, ts: normalizeDatetime(r[0]) }))
+    .filter(r => r.ts)
+    .sort((a, b) => new Date(a.ts) - new Date(b.ts));
+
+  for (const { row, ts } of sortedRows) {
     const [
-      timestamp,
+      _timestamp,
       requester_id,
       dep_alert,
       location,
@@ -77,16 +85,12 @@ for (const row of rows) {
 
     if (!requester_id || !detail_report) continue;
 
-    const ts = normalizeDatetime(timestamp);
-    if (!ts) continue;
-
-    // 🛑 กัน insert ซ้ำ
-    if (lastTs && new Date(ts) <= new Date(lastTs)) {
+    // 🛑 เช็คแค่ตัวล่าสุดของตาราง
+    if (currentLastTs && new Date(ts) <= new Date(currentLastTs)) {
       console.log('⏭ skip (old):', ts);
       continue;
     }
 
-    // ✅ แปลงชื่อแผนก → prefix
     const dep_prefix = getDepartmentPrefix(dep_alert);
 
     await db.execute(
@@ -96,7 +100,7 @@ for (const row of rows) {
       [
         ts,
         requester_id,
-        dep_prefix,   // ⭐ เก็บ prefix เท่านั้น (ไม่ error)
+        dep_prefix,
         location,
         dep_requester,
         detail_report
@@ -105,9 +109,13 @@ for (const row of rows) {
 
     console.log('✅ inserted:', ts, requester_id, dep_prefix);
     inserted++;
+
+    // 🔁 อัปเดตตัวล่าสุดหลัง insert
+    currentLastTs = ts;
   }
 
   return inserted;
 }
 
 module.exports = { syncFromSheet };
+
