@@ -1,15 +1,16 @@
 const db = require('../config/db');
 const bcrypt = require('bcrypt');
 
-/* ================สร้าง Admin 1 เท่านั้น ================== */
+//================สร้าง Admin 1 เท่านั้น ======================================
+//=========================================================================
 exports.register = async ({ pns_id, user_password, user_role }) => {
   const conn = await db.getConnection();
 
   try {
     await conn.beginTransaction();
 
-    // 1️⃣ ตรวจ personnel
-    const [personnel] = await conn.query(
+    
+    const [personnel] = await conn.query(                             //ตรวจว่ามี pns_id นี้อยู่ในตาราง personnel หรือไม่
       `SELECT pns_id, dep_id 
        FROM personnel 
        WHERE pns_id = ?`,
@@ -22,8 +23,8 @@ exports.register = async ({ pns_id, user_password, user_role }) => {
 
     const dep_id = personnel[0].dep_id;
 
-    // 2️⃣ ตรวจ department
-    const [departments] = await conn.query(
+                                                      
+    const [departments] = await conn.query(                            //ตรวจว่ามี dep_id นี้อยู่ในตาราง departments หรือไม่
       `SELECT dep_id FROM departments WHERE dep_id = ?`,
       [dep_id]
     );
@@ -32,8 +33,8 @@ exports.register = async ({ pns_id, user_password, user_role }) => {
       throw new Error('ไม่พบข้อมูลแผนก');
     }
 
-    // 3️⃣ ตรวจ user ซ้ำ
-    const [existUser] = await conn.query(
+    
+    const [existUser] = await conn.query(                               //ตรวจว่ามี user_id ซ้ำหรือไม่
       `SELECT user_id FROM users WHERE user_id = ?`,
       [pns_id]
     );
@@ -42,11 +43,11 @@ exports.register = async ({ pns_id, user_password, user_role }) => {
       throw new Error('บุคลากรนี้ถูกสมัครแล้ว');
     }
 
-    // 4️⃣ hash password
-    const hashPassword = await bcrypt.hash(user_password, 10);
+    
+    const hashPassword = await bcrypt.hash(user_password, 10);          //เข้ารหัสรหัสผ่าน (hash password)
 
-    // 5️⃣ insert users
-    await conn.query(
+    
+    await conn.query(                                                   //เพิ่มข้อมูลลงตาราง users
       `INSERT INTO users 
        (user_id, pns_id, user_password, user_last_update, user_role, dep_id)
        VALUES (?, ?, ?, NOW(), ?, ?)`,
@@ -69,8 +70,11 @@ exports.register = async ({ pns_id, user_password, user_role }) => {
     conn.release();
   }
 };
+//=========================================================================
+//=========================================================================
 
-/* ================================== */
+//==================ค้นหาผู้ใช้ 1 คน จากตาราง users โดยใช้ pns_id===============
+//=========================================================================
 exports.findUserByPnsId  = async (pns_id) => {
   const [rows] = await db.query(
     `SELECT 
@@ -86,8 +90,11 @@ exports.findUserByPnsId  = async (pns_id) => {
 
   return rows[0];
 };
+//=========================================================================
+//=========================================================================
 
-/* ================================== */
+//=============ค้นหาผู้ใช้ 1 คน จากตาราง PERSONNEL โดยใช้ pns_id===============
+//=========================================================================  
 exports.findPersonnelByPnsId = async (pns_id) => {
   console.log('🔎 QUERY personnel pns_id =', pns_id);
   console.log('🔐 LOGIN');
@@ -105,8 +112,11 @@ exports.findPersonnelByPnsId = async (pns_id) => {
   console.log('📄 personnel rows:', rows);
   return rows[0];
 };
+//=========================================================================
+//=========================================================================
 
-/* ================user update================== */
+//==================อัพเดทข้อมูล user========================================
+//=========================================================================
 exports.update = async (pns_id, data) => {
   const fields = [];
   const values = [];
@@ -165,8 +175,11 @@ exports.update = async (pns_id, data) => {
 
   return true;
 };
+//========================================================================= 
+//=========================================================================
 
-/* =================================== */
+//==================สร้างuserโดยใช้ beware admin===============================
+//=========================================================================
 exports.createByAdmin = async ({ pns_id, user_password, user_role }) => {
   const conn = await db.getConnection();
 
@@ -232,3 +245,5 @@ exports.createByAdmin = async ({ pns_id, user_password, user_role }) => {
     conn.release();
   }
 };
+//=========================================================================
+//=========================================================================

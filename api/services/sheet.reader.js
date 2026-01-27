@@ -1,11 +1,13 @@
 const path = require('path');
 const { google } = require('googleapis');
 
-const auth = new google.auth.GoogleAuth({
+const auth = new google.auth.GoogleAuth({                                      //เรียก API อ่านข้อมูลจาก Sheet
   keyFile: path.resolve(__dirname, '../credentials/service-account.json'),
   scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly']
-});
+});                                            
 
+//===========================อ่านข้อมูลจาก Google Sheet===============================
+//==================================================================================
 async function readSheet() {
   const sheets = google.sheets({
     version: 'v4',
@@ -21,3 +23,5 @@ async function readSheet() {
 }
 
 module.exports = { readSheet };
+//==================================================================================
+//==================================================================================

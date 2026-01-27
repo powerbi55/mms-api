@@ -1,9 +1,8 @@
 const db = require('../config/db');
 const { readSheet } = require('./sheet.reader');
 
-/* -----------------------------
-   Normalize DATETIME
------------------------------ */
+//============================= เเปลงค่า datetime จาก google sheet ==================
+//==================================================================================
 function normalizeDatetime(value) {
   if (!value) return null;
 
@@ -11,7 +10,7 @@ function normalizeDatetime(value) {
     return value.toISOString().slice(0, 19).replace('T', ' ');
   }
 
-  // 13/1/2026, 13:26:44 เเปลงค่าเวลาให้ใชช้ได้กับ MySQL
+  // 13/1/2026, 13:26:44 เเปลงค่าเวลาจาก google sheet ให้ใช้ได้กับ MySQL
   if (typeof value === 'string' && value.includes('/')) {
     const [d, m, rest] = value.split('/');
     const [y, time] = rest.split(', ');
@@ -20,10 +19,12 @@ function normalizeDatetime(value) {
 
   return value;
 }
+//==================================================================================
+//==================================================================================
 
-/* -----------------------------
-   Department → Prefix
------------------------------ */
+
+//============================= เเปลงค่า departmentจาก google sheet =================
+//==================================================================================  
 function getDepartmentPrefix(depAlert) {
   if (!depAlert) return 'UNKNOWN';
 
@@ -46,18 +47,18 @@ function getDepartmentPrefix(depAlert) {
 
   return 'UNKNOWN';
 }
+//==================================================================================
+//==================================================================================
 
-
-/* -----------------------------
-   Sync Job
------------------------------ */
+//============================= Sync from Google Sheet =============================
+//==================================================================================
 async function syncFromSheet() {
   const rows = await readSheet();
 
   console.log('🔍 rows[1] =', rows[1]);
   console.log('📄 rows type =', Array.isArray(rows));
 
-  // 🔐 ดึง timestamp ล่าสุดจาก DB (ตัวเดียว)
+                                                                            //ดึง timestamp ล่าสุดจาก DB (ตัวเดียว)
   const [last] = await db.execute(
     'SELECT timestamp FROM data_imports ORDER BY timestamp DESC LIMIT 1'
   );
@@ -67,7 +68,7 @@ async function syncFromSheet() {
 
   let inserted = 0;
 
-  // 🔄 เรียงข้อมูลจาก sheet ตามเวลา (กันข้อมูลสลับ)
+                                                                            //เรียงข้อมูลจาก sheet ตามเวลา (กันข้อมูลสลับ)
   const sortedRows = rows
     .map(r => ({ row: r, ts: normalizeDatetime(r[0]) }))
     .filter(r => r.ts)
@@ -85,7 +86,7 @@ async function syncFromSheet() {
 
     if (!requester_id || !detail_report) continue;
 
-    // 🛑 เช็คแค่ตัวล่าสุดของตาราง
+                                                                           //เช็คแค่ตัวล่าสุดของตาราง
     if (currentLastTs && new Date(ts) <= new Date(currentLastTs)) {
       console.log('⏭ skip (old):', ts);
       continue;
@@ -110,7 +111,7 @@ async function syncFromSheet() {
     console.log('✅ inserted:', ts, requester_id, dep_prefix);
     inserted++;
 
-    // 🔁 อัปเดตตัวล่าสุดหลัง insert
+                                                                             //อัปเดตตัวล่าสุดหลัง insert
     currentLastTs = ts;
   }
 
@@ -118,4 +119,5 @@ async function syncFromSheet() {
 }
 
 module.exports = { syncFromSheet };
-
+//==================================================================================
+//==================================================================================

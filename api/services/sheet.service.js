@@ -1,7 +1,8 @@
 const db = require('../config/db');
-
+//============================= นำเข้าข้อมูลจาก Google Sheet ==========================
+//==================================================================================
 exports.importFromGoogleSheet = async (rows) => {
-  let inserted = 0;
+  let inserted = 0;                                                              //let inserted = 0;
 
   for (const row of rows) {
     const [
@@ -13,8 +14,8 @@ exports.importFromGoogleSheet = async (rows) => {
       detail_report
     ] = row;
 
-    // validate ข้อมูลที่จำเป็น
-    if (!requester_id || !detail_report) continue;
+                                                                                  // validate ข้อมูลที่จำเป็น
+    if (!requester_id || !detail_report) continue;                                //ถ้าไม่มี requester_id หรือ detail_report → ข้าม record นี้
 
     const sql = `
       INSERT INTO data_imports
@@ -36,3 +37,5 @@ exports.importFromGoogleSheet = async (rows) => {
 
   return inserted;
 };
+//==================================================================================
+//==================================================================================
