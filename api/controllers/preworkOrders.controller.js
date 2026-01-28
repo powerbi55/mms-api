@@ -29,9 +29,22 @@ exports.getDropdowns = async (req, res) => {
 
 exports.updateWorkOrder = async (req, res) => {
   try {
+
+     console.log('REQ.USER >>>', req.user);
+
+    const updated_by = req.user.pns_id;
+
+    if (!updated_by) {
+      return res.status(401).json({
+        ok: false,
+        message: 'Unauthorized: missing user info'
+      });
+    }
+
     const job_reference = await service.updateWorkOrder(
       req.params.id,
-      req.body
+      req.body,
+      updated_by
     );
 
     res.json({
@@ -47,3 +60,4 @@ exports.updateWorkOrder = async (req, res) => {
     });
   }
 };
+
