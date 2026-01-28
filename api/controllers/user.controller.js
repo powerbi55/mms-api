@@ -30,7 +30,7 @@ exports.updateUser = async (req, res) => {
       });
     }
 
-    await userService.update(user_id, updateData);
+    await userService.update(user_id, updateData,req.user.pns_id );
 
     res.json({
       ok: true,
@@ -60,7 +60,8 @@ exports.createUserByAdmin = async (req, res) => {
     await userService.createByAdmin({
       pns_id,
       user_password,
-      user_role
+      user_role,
+      changed_by: req.user.pns_id
     });
 
     res.status(201).json({

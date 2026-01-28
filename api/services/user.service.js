@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const bcrypt = require('bcrypt');
+const userLogService = require('./userLog.service');
 
 //================สร้าง Admin 1 เท่านั้น ======================================
 //=========================================================================
@@ -117,28 +118,23 @@ exports.findPersonnelByPnsId = async (pns_id) => {
 
 //==================อัพเดทข้อมูล user========================================
 //=========================================================================
-exports.update = async (pns_id, data) => {
+exports.update = async (pns_id, data, changed_by) => {
   const fields = [];
   const values = [];
+  const detail = {};
 
-  // 🔐 UPDATE PASSWORD
   if (data.user_password) {
-    console.log('🔴 UPDATE PASSWORD');
-    console.log('incoming password:', data.user_password);
-
-    // ❌ ป้องกัน hash ซ้ำ
     if (data.user_password.startsWith('$2b$')) {
       throw new Error('Invalid password format');
     }
 
     const hash = await bcrypt.hash(data.user_password, 10);
-    console.log('new hashed password:', hash);
-
     fields.push('user_password = ?');
     values.push(hash);
+
+    detail.user_password = 'UPDATED';
   }
 
-  // 👮 UPDATE ROLE
   if (data.user_role) {
     const allowed = ['ADMIN', 'ChiefTechnician', 'Technician'];
     if (!allowed.includes(data.user_role)) {
@@ -147,12 +143,15 @@ exports.update = async (pns_id, data) => {
 
     fields.push('user_role = ?');
     values.push(data.user_role);
+
+    detail.user_role = data.user_role;
   }
 
-  // 🏢 UPDATE DEPARTMENT
   if (data.dep_id) {
     fields.push('dep_id = ?');
     values.push(data.dep_id);
+
+    detail.dep_id = data.dep_id;
   }
 
   if (fields.length === 0) {
@@ -160,8 +159,6 @@ exports.update = async (pns_id, data) => {
   }
 
   fields.push('user_last_update = NOW()');
-
-  // ✅ ใช้ pns_id ให้ตรงกับ login
   values.push(pns_id);
 
   const [result] = await db.execute(
@@ -173,14 +170,23 @@ exports.update = async (pns_id, data) => {
     throw new Error('Update failed: user not found');
   }
 
+  // ✅ LOG
+  await userLogService.createLog({
+    action: 'UPDATE_USER',
+    target_pns_id: pns_id,
+    changed_by,
+    detail
+  });
+
   return true;
 };
+
 //========================================================================= 
 //=========================================================================
 
 //==================สร้างuserโดยใช้ beware admin===============================
 //=========================================================================
-exports.createByAdmin = async ({ pns_id, user_password, user_role }) => {
+exports.createByAdmin = async ({ pns_id, user_password, user_role, changed_by }) => {
   const conn = await db.getConnection();
 
   try {
@@ -221,17 +227,24 @@ exports.createByAdmin = async ({ pns_id, user_password, user_role }) => {
     // 3️⃣ hash password
     const hashPassword = await bcrypt.hash(user_password, 10);
 
-    // 4️⃣ insert users
+
     await conn.query(
       `INSERT INTO users
        (user_id, pns_id, user_password, user_role, dep_id, user_last_update)
        VALUES (?, ?, ?, ?, ?, NOW())`,
+      [pns_id, pns_id, hashPassword, user_role, dep_id]
+    );
+
+    // ✅ LOG
+    await conn.query(
+      `INSERT INTO user_logs
+       (action, target_pns_id, changed_by, detail)
+       VALUES (?, ?, ?, ?)`,
       [
+        'CREATE_USER',
         pns_id,
-        pns_id,
-        hashPassword,
-        user_role,
-        dep_id
+        changed_by,
+        JSON.stringify({ user_role, dep_id })
       ]
     );
 
@@ -245,5 +258,36 @@ exports.createByAdmin = async ({ pns_id, user_password, user_role }) => {
     conn.release();
   }
 };
+// exports.createByAdmin = async ({ pns_id, user_password, user_role }) => {
+//   const conn = await db.getConnection();
+
+//   try {
+//     await conn.beginTransaction();
+
+    
+//     // 4️⃣ insert users
+//     await conn.query(
+//       `INSERT INTO users
+//        (user_id, pns_id, user_password, user_role, dep_id, user_last_update)
+//        VALUES (?, ?, ?, ?, ?, NOW())`,
+//       [
+//         pns_id,
+//         pns_id,
+//         hashPassword,
+//         user_role,
+//         dep_id
+//       ]
+//     );
+
+//     await conn.commit();
+//     return { success: true };
+
+//   } catch (err) {
+//     await conn.rollback();
+//     throw err;
+//   } finally {
+//     conn.release();
+//   }
+// };
 //=========================================================================
 //=========================================================================

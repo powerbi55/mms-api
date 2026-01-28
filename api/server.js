@@ -12,7 +12,7 @@ require('./jobs/sync-sheet.job');
 app.use('/api/repairs', require('./routes/repair.routes'));
 app.use('/api', require('./routes/sync.routes'));
 app.use('/api/users', require('./routes/user.routes'));
-app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/auth', require('./routes/auth.routes'));.03
 app.use('/api/work-orders', require('./routes/preworkOrders.routes'));
 
 const PORT = process.env.PORT || 3000;
