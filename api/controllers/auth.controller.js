@@ -1,10 +1,10 @@
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const jwtConfig = require('../config/jwt');
-const userService = require('../services/user.service');
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const jwtConfig = require("../config/jwt");
+const userService = require("../services/user.service");
 
 // role ที่อนุญาต (ต้องตรง ENUM)
-const ALLOWED_ROLES = ['ADMIN', 'ChiefTechnician', 'Technician'];
+const ALLOWED_ROLES = ["ADMIN", "ChiefTechnician", "Technician"];
 
 /*** REGISTER* - client ส่ง pns_id, user_password, user_role* - server validate role*/
 exports.register = async (req, res) => {
@@ -14,7 +14,7 @@ exports.register = async (req, res) => {
     if (!pns_id || !user_password || !user_role) {
       return res.status(400).json({
         ok: false,
-        message: 'Missing required data'
+        message: "Missing required data",
       });
     }
 
@@ -24,25 +24,24 @@ exports.register = async (req, res) => {
     if (!ALLOWED_ROLES.includes(role)) {
       return res.status(400).json({
         ok: false,
-        message: 'Invalid user role'
+        message: "Invalid user role",
       });
     }
 
     await userService.register({
       pns_id,
       user_password,
-      user_role: role
+      user_role: role,
     });
 
     res.status(201).json({
       ok: true,
-      message: 'Register success'
+      message: "Register success",
     });
-
   } catch (err) {
     res.status(400).json({
       ok: false,
-      message: err.message
+      message: err.message,
     });
   }
 };
@@ -55,22 +54,25 @@ exports.login = async (req, res) => {
     if (!pns_id || !user_password) {
       return res.status(400).json({
         ok: false,
-        message: 'Missing data'
+        message: "Missing data",
       });
     }
 
-    console.log('🔐 LOGIN STEP');
-    console.log('input pns_id:', pns_id);
-    console.log('input password:', user_password);
+    console.log("🔐 LOGIN STEP");
+    console.log("input pns_id:", pns_id);
+    console.log("password provided:", !!user_password);
+
+    // หลัง bcrypt.compare
+    // console.log("password match:", match);
 
     const user = await userService.findUserByPnsId(pns_id);
 
-    console.log('db user_password:', user.user_password);
+    console.log("db user_password:", user.user_password);
 
     if (!user) {
       return res.status(401).json({
         ok: false,
-        message: 'Invalid pns_id or password'
+        message: "Invalid pns_id or password",
       });
     }
 
@@ -78,7 +80,7 @@ exports.login = async (req, res) => {
     if (!match) {
       return res.status(401).json({
         ok: false,
-        message: 'Invalid pns_id or password'
+        message: "Invalid pns_id or password",
       });
     }
 
@@ -87,10 +89,10 @@ exports.login = async (req, res) => {
         user_id: user.user_id,
         pns_id: user.pns_id,
         role: user.user_role,
-        dep_id: user.dep_id
+        dep_id: user.dep_id,
       },
       jwtConfig.secret,
-      { expiresIn: jwtConfig.expiresIn }
+      { expiresIn: jwtConfig.expiresIn },
     );
 
     res.json({
@@ -100,15 +102,14 @@ exports.login = async (req, res) => {
         user_id: user.user_id,
         pns_id: user.pns_id,
         role: user.user_role,
-        dep_id: user.dep_id
-      }
+        dep_id: user.dep_id,
+      },
     });
-
   } catch (err) {
     console.error(err);
     res.status(500).json({
       ok: false,
-      message: 'Server error'
+      message: "Server error",
     });
   }
 };

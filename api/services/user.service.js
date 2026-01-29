@@ -93,14 +93,30 @@ exports.findUserByPnsId  = async (pns_id) => {
 //=========================================================================
 //=========================================================================
 
+//==================ดึงข้อมูล user profile (JOIN personnel)=====================
+//===============================================================================
+exports.getUserProfile = async (pns_id) => {
+  const [rows] = await db.query(
+    `SELECT
+        u.pns_id,
+        p.pns_name,
+        u.user_role,
+        u.dep_id
+     FROM users u
+     JOIN personnel p ON u.pns_id = p.pns_id
+     WHERE u.pns_id = ?`,
+    [pns_id]
+  );
+
+  return rows[0];
+};
+//===============================================================================
+
+
 //=============ค้นหาผู้ใช้ 1 คน จากตาราง PERSONNEL โดยใช้ pns_id===============
 //=========================================================================  
 exports.findPersonnelByPnsId = async (pns_id) => {
   console.log('🔎 QUERY personnel pns_id =', pns_id);
-  console.log('🔐 LOGIN');
-  console.log('input pns_id:', pns_id);
-  console.log('input password:', user_password);
-  console.log('db hash:', user.user_password);
 
   const [rows] = await db.query(
     `SELECT pns_id, pns_name, dep_id
@@ -114,6 +130,7 @@ exports.findPersonnelByPnsId = async (pns_id) => {
 };
 //=========================================================================
 //=========================================================================
+
 
 //==================อัพเดทข้อมูล user========================================
 //=========================================================================
@@ -244,6 +261,49 @@ exports.createByAdmin = async ({ pns_id, user_password, user_role }) => {
   } finally {
     conn.release();
   }
+};
+//=========================================================================
+//=========================================================================
+
+//==================เปลี่ยนรหัสผ่านด้วยตัวเอง====================================
+//=========================================================================
+exports.changeMyPassword = async ({ pns_id, old_password, new_password, changed_by }) => {
+  // ดึง password ปัจจุบัน
+  const [rows] = await db.execute(
+    'SELECT user_password FROM users WHERE pns_id = ?',
+    [pns_id]
+  );
+
+  if (!rows.length) {
+    throw new Error('User not found');
+  }
+
+  const user = rows[0];
+
+  // ตรวจรหัสเก่า
+  const match = await bcrypt.compare(old_password, user.user_password);
+  if (!match) {
+    throw new Error('Old password incorrect');
+  }
+
+  // hash รหัสใหม่
+  const hash = await bcrypt.hash(new_password, 10);
+
+  // update
+  await db.execute(
+    'UPDATE users SET user_password = ?, user_last_update = NOW() WHERE pns_id = ?',
+    [hash, pns_id]
+  );
+
+  // ✅ LOG
+  await userLogService.createLog({
+    action: 'CHANGE_MY_PASSWORD',
+    target_pns_id: pns_id,
+    changed_by,
+    detail: { user_password: 'SELF_UPDATED' }
+  });
+
+  return true;
 };
 //=========================================================================
 //=========================================================================

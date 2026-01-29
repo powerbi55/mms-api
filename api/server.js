@@ -3,6 +3,15 @@ require('dotenv').config();
 const express = require('express');
 const app = express();
 
+///ใช้ login 
+const cors = require('cors');
+
+app.use(cors({
+  origin: 'http://localhost:5173', // หรือ port frontend
+  credentials: true
+}));
+///จบ login
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

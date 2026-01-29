@@ -10,9 +10,10 @@ const userController = require('../controllers/user.controller');
 
 
 router.post('/admin', auth, admin, userController.createUserByAdmin);
-
-
+router.put('/change-password', auth, userController.changeMyPassword);
 router.put('/:user_id', auth, admin, userController.updateUser);
 
+//ดึงชื่อเมื่อ login
+router.get('/me', auth, userController.getMe);
 
 module.exports = router;
