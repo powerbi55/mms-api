@@ -1,6 +1,33 @@
-// น้า preworkOrders คือหน้าหลังจากตาราง preworkOrders ที่เเสดงรายการเเจ้งที่ยังไม่มีการกดรับงาน
+// preworkOrders คือหน้าหลังจากตาราง preworkOrders ที่เเสดงรายการเเจ้งที่ยังไม่มีการกดรับงาน
 // หน้านี้มีหน้าที่สำหรับเเก้ไขข้อมูลก่อนเเปิดงาน เมื่อกดบันทึกจะมีการสร้างรหัสงาน (job_reference) เเละอัพเดทสถานะงาน
 const db = require('../config/db');
+
+//===================สำหรับเลือก work order มาทั้งหมด=============================
+//===========================================================================
+exports.getWorkOrderList = async () => {
+  const [rows] = await db.query(`
+    SELECT
+      wo.workorder_id              AS id,
+      wo.job_reference             AS workOrder,
+      DATE(wo.creation_datetime)   AS reportedDate,
+      wo.requester_user_id         AS reportBy,
+      wo.detail_report             AS shortDescription,
+      wo.dep_id                    AS department,
+      wo.equipment_id              AS equipment,
+      wo.jobstatus_id              AS errorSymptom,
+      wo.post_date                 AS requiredStart,
+      wo.post_date                 AS requiredFinish,
+      wo.tp_id                     AS siteId,
+      wo.jobstatus_id
+    FROM work_orders wo
+    WHERE wo.jobstatus_id = 99
+    ORDER BY wo.creation_datetime DESC
+  `);
+
+  return rows;
+};
+
+
 
 //===================สำหรับเลือก work order ตาม id=============================
 //===========================================================================

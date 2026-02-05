@@ -1,259 +1,107 @@
 const db = require('../config/db');
 const bcrypt = require('bcrypt');
 
-//================สร้าง Admin 1 เท่านั้น ======================================
-//=========================================================================
-exports.register = async ({ pns_id, user_password, user_role }) => {
-  const conn = await db.getConnection();
-
-  try {
-    await conn.beginTransaction();
-
-    
-    const [personnel] = await conn.query(                             //ตรวจว่ามี pns_id นี้อยู่ในตาราง personnel หรือไม่
-      `SELECT pns_id, dep_id 
-       FROM personnel 
-       WHERE pns_id = ?`,
-      [pns_id]
-    );
-
-    if (personnel.length === 0) {
-      throw new Error('ไม่พบข้อมูลบุคลากร');
-    }
-
-    const dep_id = personnel[0].dep_id;
-
-                                                      
-    const [departments] = await conn.query(                            //ตรวจว่ามี dep_id นี้อยู่ในตาราง departments หรือไม่
-      `SELECT dep_id FROM departments WHERE dep_id = ?`,
-      [dep_id]
-    );
-
-    if (departments.length === 0) {
-      throw new Error('ไม่พบข้อมูลแผนก');
-    }
-
-    
-    const [existUser] = await conn.query(                               //ตรวจว่ามี user_id ซ้ำหรือไม่
-      `SELECT user_id FROM users WHERE user_id = ?`,
-      [pns_id]
-    );
-
-    if (existUser.length > 0) {
-      throw new Error('บุคลากรนี้ถูกสมัครแล้ว');
-    }
-
-    
-    const hashPassword = await bcrypt.hash(user_password, 10);          //เข้ารหัสรหัสผ่าน (hash password)
-
-    
-    await conn.query(                                                   //เพิ่มข้อมูลลงตาราง users
-      `INSERT INTO users 
-       (user_id, pns_id, user_password, user_last_update, user_role, dep_id)
-       VALUES (?, ?, ?, NOW(), ?, ?)`,
-      [
-        pns_id,
-        pns_id,
-        hashPassword,
-        user_role,
-        dep_id
-      ]
-    );
-
-    await conn.commit();
-    return { success: true };
-
-  } catch (err) {
-    await conn.rollback();
-    throw err;
-  } finally {
-    conn.release();
-  }
+/* =========================================================================
+   LOG HELPER (ตรงกับ table user_logs)
+============================================================================ */
+const insertUserLog = async (conn, {
+  action,
+  target_pns_id,
+  changed_by,
+  detail = null,
+}) => {
+  await conn.execute(
+    `INSERT INTO user_logs
+     (action, target_pns_id, changed_by, detail, created_at)
+     VALUES (?, ?, ?, ?, NOW())`,
+    [
+      action,
+      target_pns_id,
+      changed_by,
+      detail, // ❗ JSON column → ส่ง object ได้ตรง ๆ
+    ]
+  );
 };
-//=========================================================================
-//=========================================================================
 
-//==================ค้นหาผู้ใช้ 1 คน จากตาราง users โดยใช้ pns_id===============
-//=========================================================================
-exports.findUserByPnsId  = async (pns_id) => {
+/* =========================================================================
+   AUTH DOMAIN (ใช้กับ login เท่านั้น)
+============================================================================ */
+exports.findUserForAuthByPnsId = async (pns_id) => {
   const [rows] = await db.query(
-    `SELECT 
-        user_id,
-        pns_id,
-        user_password,
-        user_role,
-        dep_id
+    `SELECT user_id, pns_id, user_password, user_role, dep_id
      FROM users
      WHERE pns_id = ?`,
     [pns_id]
   );
-
   return rows[0];
 };
-//=========================================================================
-//=========================================================================
 
-//==================ดึงข้อมูล user profile (JOIN personnel)=====================
-//===============================================================================
-exports.getUserProfile = async (pns_id) => {
+/* =========================================================================
+   PROFILE DOMAIN
+============================================================================ */
+exports.getUserProfileByPnsId = async (pns_id) => {
   const [rows] = await db.query(
-    `SELECT
-        u.pns_id,
-        p.pns_name,
-        u.user_role,
-        u.dep_id
+    `SELECT u.pns_id, p.pns_name, u.user_role, u.dep_id
      FROM users u
      JOIN personnel p ON u.pns_id = p.pns_id
      WHERE u.pns_id = ?`,
     [pns_id]
   );
-
   return rows[0];
 };
-//===============================================================================
 
-
-//=============ค้นหาผู้ใช้ 1 คน จากตาราง PERSONNEL โดยใช้ pns_id===============
-//=========================================================================  
+/* =========================================================================
+   PERSONNEL DOMAIN
+============================================================================ */
 exports.findPersonnelByPnsId = async (pns_id) => {
-  console.log('🔎 QUERY personnel pns_id =', pns_id);
-
   const [rows] = await db.query(
     `SELECT pns_id, pns_name, dep_id
      FROM personnel
      WHERE pns_id = ?`,
     [pns_id]
   );
-
-  console.log('📄 personnel rows:', rows);
   return rows[0];
 };
-//=========================================================================
-//=========================================================================
 
-
-//==================อัพเดทข้อมูล user========================================
-//=========================================================================
-exports.update = async (pns_id, data) => {
-  const fields = [];
-  const values = [];
-
-  // 🔐 UPDATE PASSWORD
-  if (data.user_password) {
-    console.log('🔴 UPDATE PASSWORD');
-    console.log('incoming password:', data.user_password);
-
-    // ❌ ป้องกัน hash ซ้ำ
-    if (data.user_password.startsWith('$2b$')) {
-      throw new Error('Invalid password format');
-    }
-
-    const hash = await bcrypt.hash(data.user_password, 10);
-    console.log('new hashed password:', hash);
-
-    fields.push('user_password = ?');
-    values.push(hash);
-  }
-
-  // 👮 UPDATE ROLE
-  if (data.user_role) {
-    const allowed = ['ADMIN', 'ChiefTechnician', 'Technician'];
-    if (!allowed.includes(data.user_role)) {
-      throw new Error('Invalid user role');
-    }
-
-    fields.push('user_role = ?');
-    values.push(data.user_role);
-  }
-
-  // 🏢 UPDATE DEPARTMENT
-  if (data.dep_id) {
-    fields.push('dep_id = ?');
-    values.push(data.dep_id);
-  }
-
-  if (fields.length === 0) {
-    throw new Error('No data to update');
-  }
-
-  fields.push('user_last_update = NOW()');
-
-  // ✅ ใช้ pns_id ให้ตรงกับ login
-  values.push(pns_id);
-
-  const [result] = await db.execute(
-    `UPDATE users SET ${fields.join(', ')} WHERE pns_id = ?`,
-    values
-  );
-
-  if (result.affectedRows === 0) {
-    throw new Error('Update failed: user not found');
-  }
-
-  return true;
-};
-//========================================================================= 
-//=========================================================================
-
-//==================สร้างuserโดยใช้ beware admin===============================
-//=========================================================================
-exports.createByAdmin = async ({ pns_id, user_password, user_role }) => {
+/* =========================================================================
+   CHANGE PASSWORD (USER เปลี่ยนของตัวเอง)
+============================================================================ */
+exports.changeMyPasswordWithLog = async ({
+  target_pns_id,
+  new_password,
+  changed_by,
+}) => {
   const conn = await db.getConnection();
 
   try {
     await conn.beginTransaction();
 
-    // 0️⃣ validate
-    if (!pns_id || !user_password || !user_role) {
-      throw new Error('ข้อมูลไม่ครบ');
-    }
+    const hashed = await bcrypt.hash(new_password, 10);
 
-
-    // 1️⃣ ตรวจ personnel
-    const [personnel] = await conn.query(
-      `SELECT dep_id 
-       FROM personnel 
+    // 1) update password
+    const [result] = await conn.execute(
+      `UPDATE users
+       SET user_password = ?, user_last_update = NOW()
        WHERE pns_id = ?`,
-      [pns_id]
+      [hashed, target_pns_id]
     );
 
-    if (personnel.length === 0) {
-      throw new Error('Personnel not found');
+    if (result.affectedRows === 0) {
+      throw new Error('User not found');
     }
 
-    const dep_id = personnel[0].dep_id;
-
-    // 2️⃣ ตรวจ user ซ้ำ (ต้องเช็กจาก pns_id)
-    const [exist] = await conn.query(
-      `SELECT user_id 
-       FROM users 
-       WHERE pns_id = ?`,
-      [pns_id]
-    );
-
-    if (exist.length > 0) {
-      throw new Error('User already exists');
-    }
-
-    // 3️⃣ hash password
-    const hashPassword = await bcrypt.hash(user_password, 10);
-
-    // 4️⃣ insert users
-    await conn.query(
-      `INSERT INTO users
-       (user_id, pns_id, user_password, user_role, dep_id, user_last_update)
-       VALUES (?, ?, ?, ?, ?, NOW())`,
-      [
-        pns_id,
-        pns_id,
-        hashPassword,
-        user_role,
-        dep_id
-      ]
-    );
+    // 2) log (ใช้ action เดียวกับระบบเดิม)
+    await insertUserLog(conn, {
+      action: 'UPDATE_USER',
+      target_pns_id,
+      changed_by,
+      detail: {
+        user_password: 'CHANGED',
+      },
+    });
 
     await conn.commit();
-    return { success: true };
+    return true;
 
   } catch (err) {
     await conn.rollback();
@@ -262,48 +110,80 @@ exports.createByAdmin = async ({ pns_id, user_password, user_role }) => {
     conn.release();
   }
 };
-//=========================================================================
-//=========================================================================
 
-//==================เปลี่ยนรหัสผ่านด้วยตัวเอง====================================
-//=========================================================================
-exports.changeMyPassword = async ({ pns_id, old_password, new_password, changed_by }) => {
-  // ดึง password ปัจจุบัน
-  const [rows] = await db.execute(
-    'SELECT user_password FROM users WHERE pns_id = ?',
-    [pns_id]
-  );
+/* =========================================================================
+   ADMIN UPDATE USER
+============================================================================ */
+exports.updateUserByAdminWithLog = async ({
+  target_pns_id,
+  updateData,
+  changed_by,
+}) => {
+  const conn = await db.getConnection();
 
-  if (!rows.length) {
-    throw new Error('User not found');
+  try {
+    await conn.beginTransaction();
+
+    const fields = [];
+    const values = [];
+    const detail = {};
+
+    // PASSWORD
+    if (updateData.user_password) {
+      const hashed = await bcrypt.hash(updateData.user_password, 10);
+      fields.push('user_password = ?');
+      values.push(hashed);
+      detail.user_password = 'CHANGED';
+    }
+
+    // ROLE
+    if (updateData.user_role) {
+      fields.push('user_role = ?');
+      values.push(updateData.user_role);
+      detail.user_role = updateData.user_role;
+    }
+
+    // DEPARTMENT
+    if (updateData.dep_id) {
+      fields.push('dep_id = ?');
+      values.push(updateData.dep_id);
+      detail.dep_id = updateData.dep_id;
+    }
+
+    if (fields.length === 0) {
+      throw new Error('No data to update');
+    }
+
+    fields.push('user_last_update = NOW()');
+    values.push(target_pns_id);
+
+    // 1) update users
+    const [result] = await conn.execute(
+      `UPDATE users
+       SET ${fields.join(', ')}
+       WHERE pns_id = ?`,
+      values
+    );
+
+    if (result.affectedRows === 0) {
+      throw new Error('User not found');
+    }
+
+    // 2) log
+    await insertUserLog(conn, {
+      action: 'UPDATE_USER',
+      target_pns_id,
+      changed_by,
+      detail,
+    });
+
+    await conn.commit();
+    return true;
+
+  } catch (err) {
+    await conn.rollback();
+    throw err;
+  } finally {
+    conn.release();
   }
-
-  const user = rows[0];
-
-  // ตรวจรหัสเก่า
-  const match = await bcrypt.compare(old_password, user.user_password);
-  if (!match) {
-    throw new Error('Old password incorrect');
-  }
-
-  // hash รหัสใหม่
-  const hash = await bcrypt.hash(new_password, 10);
-
-  // update
-  await db.execute(
-    'UPDATE users SET user_password = ?, user_last_update = NOW() WHERE pns_id = ?',
-    [hash, pns_id]
-  );
-
-  // ✅ LOG
-  await userLogService.createLog({
-    action: 'CHANGE_MY_PASSWORD',
-    target_pns_id: pns_id,
-    changed_by,
-    detail: { user_password: 'SELF_UPDATED' }
-  });
-
-  return true;
 };
-//=========================================================================
-//=========================================================================

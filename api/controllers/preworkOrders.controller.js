@@ -1,16 +1,44 @@
 const service = require('../services/preworkOrders.service');
 
+//ดึง work order มาแสดงทั้งหมด
+exports.getWorkOrderList = async (req, res) => {
+  try {
+    const rows = await preworkOrdersService.getPreWorkOrders();
+
+    res.json({
+      data: rows,   // 👈 สำคัญ
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+
+//ดึง work order 1 ตัวมาแสดง
 exports.getWorkOrder = async (req, res) => {
   try {
     const data = await service.getWorkOrderById(req.params.id);
+
     if (!data) {
-      return res.status(404).json({ ok: false, message: 'Not found' });
+      return res.status(404).json({
+        ok: false,
+        message: 'Work order not found'
+      });
     }
-    res.json(data);
+
+    res.json({
+      ok: true,
+      data
+    });
+
   } catch (err) {
-    res.status(400).json({ ok: false, message: err.message });
+    res.status(400).json({
+      ok: false,
+      message: err.message
+    });
   }
 };
+
 
 /* dropdown */
 exports.getDropdowns = async (req, res) => {

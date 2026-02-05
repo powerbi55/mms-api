@@ -62,25 +62,25 @@ exports.login = async (req, res) => {
     console.log("input pns_id:", pns_id);
     console.log("password provided:", !!user_password);
 
-    // หลัง bcrypt.compare
-    // console.log("password match:", match);
-
-    const user = await userService.findUserByPnsId(pns_id);
-
-    console.log("db user_password:", user.user_password);
+    const user = await userService.findUserForAuthByPnsId(pns_id);
 
     if (!user) {
       return res.status(401).json({
         ok: false,
-        message: "Invalid pns_id or password",
+        message: "Username หรือ Password ไม่ถูกต้อง",
       });
     }
 
+    console.log("db user_password:", user.user_password);
+
     const match = await bcrypt.compare(user_password, user.user_password);
+
+    console.log("password match:", match);
+
     if (!match) {
       return res.status(401).json({
         ok: false,
-        message: "Invalid pns_id or password",
+        message: "Username หรือ Password ไม่ถูกต้อง",
       });
     }
 
@@ -92,7 +92,7 @@ exports.login = async (req, res) => {
         dep_id: user.dep_id,
       },
       jwtConfig.secret,
-      { expiresIn: jwtConfig.expiresIn },
+      { expiresIn: jwtConfig.expiresIn }
     );
 
     res.json({
@@ -113,3 +113,4 @@ exports.login = async (req, res) => {
     });
   }
 };
+

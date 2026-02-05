@@ -1,50 +1,45 @@
 const userService = require("../services/user.service");
 const bcrypt = require("bcrypt");
 
-// ตรวจหาชื่อเมื่อ login เสร็จว่าใคร login
+// ================== GET ME ==================
 exports.getMe = async (req, res) => {
   try {
-    const user = req.user; // มาจาก JWT middleware
+    const { pns_id } = req.user;
 
-    // สมมติ userService JOIN ตาราง pns
-    const profile = await userService.getUserProfile(user.pns_id);
+    const profile = await userService.getUserProfileByPnsId(pns_id);
 
     res.json({
       ok: true,
       data: {
         pns_id: profile.pns_id,
         pns_name: profile.pns_name,
-        role: profile.role,
+        role: profile.user_role,
         dep_id: profile.dep_id,
       },
     });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ ok: false, message: "Server error" });
   }
 };
-//=========================================================================
-//=========================================================================
 
-/*updateuser ==> อัพเดตข้อมูล user(ต้องมีสิทธิ ADMIN เท่านั้น )*/
+// ================== ADMIN UPDATE USER ==================
 exports.updateUser = async (req, res) => {
   try {
-    const { user_id } = req.params;
+    const { user_id } = req.params; // target pns_id
     const { user_password, user_role, dep_id } = req.body;
+    const changed_by = req.user.pns_id;
 
     const updateData = {};
 
-    // update password ปรับแก้ใหม่ ต้องมี hash ไม่งั้นเมื่ออัปเดต login จะพัง
     if (user_password) {
-      const hashed = await bcrypt.hash(user_password, 10);
-      updateData.user_password = hashed;
+      updateData.user_password = user_password; // plain
     }
 
-    // update role
     if (user_role) {
       updateData.user_role = user_role;
     }
 
-    // update department
     if (dep_id) {
       updateData.dep_id = dep_id;
     }
@@ -56,73 +51,83 @@ exports.updateUser = async (req, res) => {
       });
     }
 
-    await userService.update(user_id, updateData, req.user.pns_id);
+    await userService.updateUserByAdminWithLog({
+      target_pns_id: user_id,
+      updateData,
+      changed_by,
+    });
 
     res.json({
       ok: true,
       message: "User updated",
     });
   } catch (err) {
+    console.error(err);
     res.status(400).json({
       ok: false,
       message: err.message,
     });
   }
 };
-//=========================================================================
-//=========================================================================
 
-//==================สร้างผู้ใช้ใหม่ โดยแอดมิน====================================
-//=========================================================================
-exports.createUserByAdmin = async (req, res) => {
+// ================== CHANGE MY PASSWORD ==================
+exports.changeMyPassword = async (req, res) => {
   try {
-    const { pns_id, user_password, user_role } = req.body;
+    const { old_password, new_password } = req.body;
+    const { pns_id } = req.user;
 
-    if (!pns_id || !user_password || !user_role) {
+    if (!old_password || !new_password) {
       return res.status(400).json({
         ok: false,
-        message: "Missing required data",
+        message: "Missing password data",
       });
     }
 
-    await userService.createByAdmin({
-      pns_id,
-      user_password,
-      user_role,
-      changed_by: req.user.pns_id,
-    });
+    if (new_password.length < 6) {
+      return res.status(400).json({
+        ok: false,
+        message: "New password must be at least 6 characters",
+      });
+    }
 
-    res.status(201).json({
-      ok: true,
-      message: "User created by admin",
-    });
-  } catch (err) {
-    res.status(400).json({
-      ok: false,
-      message: err.message,
-    });
-  }
-};
+    // 🔐 ใช้ auth function เท่านั้น
+    const user = await userService.findUserForAuthByPnsId(pns_id);
 
-//=================เปลี่ยนรหัสผ่านด้วยตัวเอง=====================================
-//========================================================================= 
-exports.changeMyPassword = async (req, res) => {
-  try {
-    console.log('>>> CHANGE PASSWORD CONTROLLER HIT');
-    const { old_password, new_password } = req.body;
+    if (!user) {
+      return res.status(404).json({
+        ok: false,
+        message: "User not found",
+      });
+    }
 
-    await userService.changeMyPassword({
-      pns_id: req.user.pns_id,
+    const match = await bcrypt.compare(
       old_password,
+      user.user_password
+    );
+
+    if (!match) {
+      return res.status(401).json({
+        ok: false,
+        message: "Old password is incorrect",
+      });
+    }
+
+    // ✅ ฟังก์ชันที่มี INSERT user_log
+    await userService.changeMyPasswordWithLog({
+      target_pns_id: pns_id,
       new_password,
-      changed_by: req.user.pns_id
+      changed_by: pns_id,
     });
 
-    res.json({ ok: true, message: 'Password changed successfully' });
-
+    res.json({
+      ok: true,
+      message: "Password changed successfully",
+    });
   } catch (err) {
-    res.status(400).json({ ok: false, message: err.message });
+    console.error(err);
+    res.status(500).json({
+      ok: false,
+      message: "Server error",
+    });
   }
 };
-//=========================================================================
-//=========================================================================
