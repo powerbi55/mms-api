@@ -1,12 +1,27 @@
 const express = require('express');
 const router = express.Router();
-const preworkOrderController = require('../controllers/preworkOrders.controller');
-const auth = require('../middleware/auth.middleware');
-const controller = require('../controllers/preworkOrders.controller');
 
-router.get('/dropdowns', preworkOrderController.getDropdowns);
-router.put('/:id',auth,controller.updateWorkOrder);
-router.get('/pre-work' ,controller.getWorkOrderList); 
-router.get('/work-orders/:id',auth,controller.getWorkOrder);
+const controller = require('../controllers/preworkOrders.controller');
+const auth = require('../middleware/auth.middleware');
+
+// =========================
+// Dropdowns (master data)
+// =========================
+router.get('/dropdowns', auth, controller.getMasters);
+
+// =========================
+// Pre-work list
+// =========================
+router.get('/prework-list', auth, controller.getWorkOrderList);
+
+// =========================
+// Get work order by id
+// =========================
+router.get('/:id', auth, controller.getWorkOrder);
+
+// =========================
+// Update work order
+// =========================
+router.put('/:id', auth, controller.updateWorkOrder);
 
 module.exports = router;

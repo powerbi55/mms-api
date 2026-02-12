@@ -1,20 +1,30 @@
+// preworkOrders.controller.js
 const service = require('../services/preworkOrders.service');
 
-//ดึง work order มาแสดงทั้งหมด
+//=====================================================================
+// ดึง work order มาแสดงทั้งหมด
+//=====================================================================
 exports.getWorkOrderList = async (req, res) => {
   try {
-    const rows = await preworkOrdersService.getPreWorkOrders();
+    const rows = await service.getWorkOrderList();
 
     res.json({
-      data: rows,   // 👈 สำคัญ
+      ok: true,
+      data: rows,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('❌ Error in getWorkOrderList:', err);
+    res.status(500).json({ 
+      ok: false,
+      message: 'ไม่สามารถดึงข้อมูล Work Orders ได้',
+      error: err.message 
+    });
   }
 };
 
-
-//ดึง work order 1 ตัวมาแสดง
+//=====================================================================
+// ดึง work order 1 ตัวมาแสดง
+//=====================================================================
 exports.getWorkOrder = async (req, res) => {
   try {
     const data = await service.getWorkOrderById(req.params.id);
@@ -22,70 +32,107 @@ exports.getWorkOrder = async (req, res) => {
     if (!data) {
       return res.status(404).json({
         ok: false,
-        message: 'Work order not found'
+        message: 'Work order not found',
       });
     }
 
     res.json({
       ok: true,
-      data
+      data,
     });
-
   } catch (err) {
+    console.error('❌ Error in getWorkOrder:', err);
     res.status(400).json({
       ok: false,
-      message: err.message
+      message: err.message,
     });
   }
 };
 
+//=====================================================================
+// Dropdowns textbox
+//=====================================================================
+exports.getMasters = async (req, res) => {
+  try {
+    const [
+      personnelRows,
+      departmentRows,
+      locationRows,
+      jobStatusRows,
+      equipmentRows,
+      customerRows,
+      impactRows,
+      symptomRows,
+      priorityRows,
+      faultCodeRows,
+    ] = await Promise.all([
+      service.getPersonnel(),
+      service.getDepartments(),
+      service.getLocations(),
+      service.getJobStatuses(),
+      service.getEquipments(),
+      service.getCustomers(),
+      service.getImpacts(),
+      service.getErrorSymptoms(),
+      service.getPriorities(),
+      service.getFaultCodes(),
+    ]);
 
-/* dropdown */
-exports.getDropdowns = async (req, res) => {
-  const [personnel] = await service.getPersonnel();
-  const [departments] = await service.getDepartments();
-  const [locations] = await service.getLocations();
-  const [jobstatuses] = await service.getJobStatuses();
-
-  res.json({
-    personnel,
-    departments,
-    locations,
-    jobstatuses
-  });
+    res.json({
+      ok: true,
+      personnel: personnelRows[0] || [],
+      departments: departmentRows[0] || [],
+      locations: locationRows[0] || [],
+      jobStatuses: jobStatusRows[0] || [],
+      equipments: equipmentRows[0] || [],
+      customers: customerRows[0] || [],
+      impacts: impactRows[0] || [],
+      symptoms: symptomRows[0] || [],
+      priorities: priorityRows[0] || [],
+      faultCodes: faultCodeRows[0] || [],
+    });
+  } catch (err) {
+    console.error('❌ Error in getMasters:', err);
+    res.status(500).json({ ok: false, message: err.message });
+  }
 };
 
+//=====================================================================
+// Update Work Order
+//=====================================================================
 exports.updateWorkOrder = async (req, res) => {
   try {
+    console.log('REQ.USER >>>', req.user);
 
-     console.log('REQ.USER >>>', req.user);
-
-    const updated_by = req.user.pns_id;
+    const updated_by = req.user?.pns_id;
 
     if (!updated_by) {
       return res.status(401).json({
         ok: false,
-        message: 'Unauthorized: missing user info'
+        message: 'Unauthorized: missing user info',
       });
     }
 
-    const job_reference = await service.updateWorkOrder(
+    const result = await service.updateWorkOrder(
       req.params.id,
       req.body,
       updated_by
     );
 
+    const message = result.confirmOpen && result.isFirstOpen 
+      ? 'เปิดงานสำเร็จ' 
+      : 'บันทึกข้อมูลสำเร็จ';
+
     res.json({
       ok: true,
-      message: 'Work order updated',
-      job_reference
+      message,
+      data: result,
     });
-
   } catch (err) {
+    console.error('❌ Error in updateWorkOrder:', err);
     res.status(400).json({
       ok: false,
-      message: err.message
+      message: err.message,
     });
   }
 };
-

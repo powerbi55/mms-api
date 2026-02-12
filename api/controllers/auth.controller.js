@@ -49,7 +49,8 @@ exports.register = async (req, res) => {
 /*** LOGIN* - ใช้ pns_id + password* - ใส่ role + dep_id ใน JWT*/
 exports.login = async (req, res) => {
   try {
-    const { pns_id, user_password } = req.body;
+    const pns_id = req.body.pns_id?.trim();
+    const user_password = req.body.user_password?.trim();
 
     if (!pns_id || !user_password) {
       return res.status(400).json({
@@ -92,7 +93,7 @@ exports.login = async (req, res) => {
         dep_id: user.dep_id,
       },
       jwtConfig.secret,
-      { expiresIn: jwtConfig.expiresIn }
+      { expiresIn: jwtConfig.expiresIn },
     );
 
     res.json({
@@ -113,4 +114,3 @@ exports.login = async (req, res) => {
     });
   }
 };
-
