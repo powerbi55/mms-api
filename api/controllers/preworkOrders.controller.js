@@ -1,4 +1,5 @@
 // preworkOrders.controller.js
+// ✅ ลบ faultCodes ออกแล้ว
 const service = require('../services/preworkOrders.service');
 
 //=====================================================================
@@ -51,6 +52,7 @@ exports.getWorkOrder = async (req, res) => {
 
 //=====================================================================
 // Dropdowns textbox
+// ✅ ลบ faultCodes ออกแล้ว
 //=====================================================================
 exports.getMasters = async (req, res) => {
   try {
@@ -64,7 +66,8 @@ exports.getMasters = async (req, res) => {
       impactRows,
       symptomRows,
       priorityRows,
-      faultCodeRows,
+      fundRows,
+      fundCenterRows,
     ] = await Promise.all([
       service.getPersonnel(),
       service.getDepartments(),
@@ -75,9 +78,11 @@ exports.getMasters = async (req, res) => {
       service.getImpacts(),
       service.getErrorSymptoms(),
       service.getPriorities(),
-      service.getFaultCodes(),
+      service.getFunds(),
+      service.getFundCenters(),
     ]);
 
+    // ✅ ลบ faultCodes ออกจาก response
     res.json({
       ok: true,
       personnel: personnelRows[0] || [],
@@ -89,11 +94,16 @@ exports.getMasters = async (req, res) => {
       impacts: impactRows[0] || [],
       symptoms: symptomRows[0] || [],
       priorities: priorityRows[0] || [],
-      faultCodes: faultCodeRows[0] || [],
+      funds: fundRows[0] || [],
+      fundCenters: fundCenterRows[0] || [],
     });
   } catch (err) {
     console.error('❌ Error in getMasters:', err);
-    res.status(500).json({ ok: false, message: err.message });
+    res.status(500).json({ 
+      ok: false, 
+      message: 'ไม่สามารถดึงข้อมูล dropdowns ได้',
+      error: err.message 
+    });
   }
 };
 
@@ -119,13 +129,9 @@ exports.updateWorkOrder = async (req, res) => {
       updated_by
     );
 
-    const message = result.confirmOpen && result.isFirstOpen 
-      ? 'เปิดงานสำเร็จ' 
-      : 'บันทึกข้อมูลสำเร็จ';
-
     res.json({
       ok: true,
-      message,
+      message: result.isFirstOpen ? 'เปิดงานสำเร็จ' : 'อัพเดทงานสำเร็จ',
       data: result,
     });
   } catch (err) {
