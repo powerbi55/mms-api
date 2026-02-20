@@ -8,7 +8,7 @@ const app = express();
 const cors = require('cors');
 
 app.use(cors({
-  origin: 'http://172.16.12.101:5173', // หรือ port frontend
+  origin: 'http://localhost:5173', // หรือ port frontend
   credentials: true
 }));
 ///จบ login
