@@ -29,14 +29,13 @@ app.use('/api/prework-orders', require('./routes/preworkOrders.routes'));
 app.use('/api/activity-orders', require('./routes/Activityworkorders.routes'));
 
 // // Image routes (nested under activity-orders)
-// app.use('/api/activity-orders/:id/images', require('./routes/imageFiles.routes'));
 app.use('/api/activity-orders/:id/images', require('./routes/imageFiles.routes'));
-app.use('/api/historical-orders/:id/images', require('./routes/imageFiles.routes'));
+
 // Historycal Work Orders (read-only)
 app.use('/api/historical-orders', require('./routes/Historicalworkorders.routes'));
 
 // // Image routes สำหรับ Historical (GET only — ใช้ไฟล์ routes เดิมร่วมกันได้เลย)
-// app.use('/api/historical-orders/:id/images', require('./routes/imageFiles.routes'));
+app.use('/api/historical-orders/:id/images', require('./routes/imageFiles.routes'));
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
