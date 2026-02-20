@@ -1,5 +1,4 @@
 // preworkOrders.controller.js
-// ✅ ลบ faultCodes ออกแล้ว
 const service = require('../services/preworkOrders.service');
 
 //=====================================================================
@@ -7,11 +6,21 @@ const service = require('../services/preworkOrders.service');
 //=====================================================================
 exports.getWorkOrderList = async (req, res) => {
   try {
-    const rows = await service.getWorkOrderList();
+    const filters = {
+      workOrder: req.query.workOrder || '',
+      equipment: req.query.equipment || '',
+      siteId: req.query.siteId || '',
+      department: req.query.department || '',
+    };
+
+    console.log('🔍 Search filters:', filters);
+
+    const rows = await service.getWorkOrderList(filters);
 
     res.json({
       ok: true,
       data: rows,
+      filters, // ส่งกลับเพื่อ debug
     });
   } catch (err) {
     console.error('❌ Error in getWorkOrderList:', err);
@@ -52,7 +61,6 @@ exports.getWorkOrder = async (req, res) => {
 
 //=====================================================================
 // Dropdowns textbox
-// ✅ ลบ faultCodes ออกแล้ว
 //=====================================================================
 exports.getMasters = async (req, res) => {
   try {
@@ -68,6 +76,7 @@ exports.getMasters = async (req, res) => {
       priorityRows,
       fundRows,
       fundCenterRows,
+      testPointRows,
     ] = await Promise.all([
       service.getPersonnel(),
       service.getDepartments(),
@@ -80,9 +89,9 @@ exports.getMasters = async (req, res) => {
       service.getPriorities(),
       service.getFunds(),
       service.getFundCenters(),
+      service.getTestPoints(),
     ]);
 
-    // ✅ ลบ faultCodes ออกจาก response
     res.json({
       ok: true,
       personnel: personnelRows[0] || [],
@@ -96,6 +105,7 @@ exports.getMasters = async (req, res) => {
       priorities: priorityRows[0] || [],
       funds: fundRows[0] || [],
       fundCenters: fundCenterRows[0] || [],
+      testPoints: testPointRows[0] || [],
     });
   } catch (err) {
     console.error('❌ Error in getMasters:', err);
